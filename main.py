@@ -157,18 +157,11 @@ def calcular_calificacion(total_puntos, puntos_obtenidos):
         porcentaje = (puntos_obtenidos / total_puntos) * 100
 
         if porcentaje >= 60:
-            # Calcular la calificación para el rango de 4 a 7
-            calificacion = 4 + (3 / 40) * (porcentaje - 60)
+            # Calcular la calificación para el rango de 4 a 7 redondeado a 2 decimales
+            return round(max(1, min(4 + (3 / 40) * (porcentaje - 60), 7)), 2)
         else:
-            # Calcular la calificación para el rango de 1 a 4
-            calificacion = 1 + (3 / 60) * porcentaje
-
-        calificacion = max(1, min(calificacion, 7))
-
-        # Redondear a dos decimales
-        calificacion = round(calificacion, 2)
-
-        return calificacion
+            # Calcular la calificación para el rango de 1 a 4 redondeado a 2 decimales
+            return round(max(1, min(1 + (3 / 60) * porcentaje, 7)), 2)
 
 
 @login_manager.user_loader
