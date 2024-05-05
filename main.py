@@ -210,6 +210,12 @@ def verify_ayudante(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard.', 'danger')
         return False
 
+def get_fields(forms):
+    fields = {}
+    for key in forms:
+        fields[key] = request.form.get(key)
+    return fields
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -255,27 +261,24 @@ def register_page():
 def register():
 
     # Obtén los datos del formulario
-    nombres= request.form.get('nombres')
-    apellidos = request.form.get('apellidos')
-    correo = request.form.get('correo')
-    password = request.form.get('password')
+    data = get_fields(['nombres', 'apellidos', 'correo', 'password'])
 
-    if not nombres or not apellidos or not correo or not password:
+    if not data['nombres'] or not data['apellidos'] or not data['correo'] or not data['password']:
         flash('Todos los campos son requeridos.', 'danger')
         return render_template('registersupervisor.html')
     
     # Verifica si ya existe un supervisor con ese correo
-    supervisor = Supervisor.query.filter_by(correo=correo).first()
+    supervisor = Supervisor.query.filter_by(correo=data['correo']).first()
     if supervisor:
         flash('Ya existe un supervisor con ese correo.', 'warning')
         return render_template('register.html')
     
     # Crea el nuevo supervisor
     new_supervisor = Supervisor(
-        nombres=nombres,
-        apellidos=apellidos,
-        correo=correo,
-        password=generate_password_hash(password)  # Almacena la contraseña de forma segura
+        nombres=data['nombres'],
+        apellidos=data['apellidos'],
+        correo=data['correo'],
+        password=generate_password_hash(data['password'])  # Almacena la contraseña de forma segura
     )
 
     # Añade el nuevo supervisor a la base de datos
