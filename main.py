@@ -22,7 +22,11 @@ from logging.config import dictConfig
 from ansi2html import Ansi2HTMLConverter
 import json
 
+#Refactoring try-catch
+import logging
 
+# Configura el logger
+logging.basicConfig(filename='error.log', level=logging.ERROR)
 dictConfig({
     'version': 1,
     'formatters': {
@@ -164,16 +168,24 @@ def calcular_calificacion(total_puntos, puntos_obtenidos):
             return round(max(1, min(1 + (3 / 60) * porcentaje, 7)), 2)
 
 
+#Refactoring  try-catch 1
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id.startswith("e"):
-        user = db.session.get(Estudiante, int(user_id[1:]))
-    elif user_id.startswith("s"):
-        user = db.session.get(Supervisor, int(user_id[1:]))
-    else:
-        return None
+    try:
+        if user_id.startswith("e"):
+            user = db.session.get(Estudiante, int(user_id[1:]))
+        elif user_id.startswith("s"):
+            user = db.session.get(Supervisor, int(user_id[1:]))
+        else:
+            return None
 
-    return user
+        return user
+    except Exception as e:
+        # Registra el error en el log
+        logging.error(f"Error en la función load_user: {e}")
+        # Redirige a la página de inicio en caso de error
+        return redirect(url_for('home'))
+
 
 # Verifica que el usuario logueado es un Supervisor
 def verify_supervisor(supervisor_id):
@@ -257,37 +269,43 @@ def home():
 def register_page():
     return render_template('register.html')
 
+#Refactoring try-catch 2
 @app.route('/registersupervisor', methods=['GET', 'POST'])
 def register():
+    try:
+        # Obtén los datos del formulario
+        data = get_fields(['nombres', 'apellidos', 'correo', 'password'])
 
-    # Obtén los datos del formulario
-    data = get_fields(['nombres', 'apellidos', 'correo', 'password'])
+        if not data['nombres'] or not data['apellidos'] or not data['correo'] or not data['password']:
+            flash('Todos los campos son requeridos.', 'danger')
+            return render_template('registersupervisor.html')
+        
+        # Verifica si ya existe un supervisor con ese correo
+        supervisor = Supervisor.query.filter_by(correo=data['correo']).first()
+        if supervisor:
+            flash('Ya existe un supervisor con ese correo.', 'warning')
+            return render_template('register.html')
+        
+        # Crea el nuevo supervisor
+        new_supervisor = Supervisor(
+            nombres=data['nombres'],
+            apellidos=data['apellidos'],
+            correo=data['correo'],
+            password=generate_password_hash(data['password'])  # Almacena la contraseña de forma segura
+        )
 
-    if not data['nombres'] or not data['apellidos'] or not data['correo'] or not data['password']:
-        flash('Todos los campos son requeridos.', 'danger')
-        return render_template('registersupervisor.html')
-    
-    # Verifica si ya existe un supervisor con ese correo
-    supervisor = Supervisor.query.filter_by(correo=data['correo']).first()
-    if supervisor:
-        flash('Ya existe un supervisor con ese correo.', 'warning')
-        return render_template('register.html')
-    
-    # Crea el nuevo supervisor
-    new_supervisor = Supervisor(
-        nombres=data['nombres'],
-        apellidos=data['apellidos'],
-        correo=data['correo'],
-        password=generate_password_hash(data['password'])  # Almacena la contraseña de forma segura
-    )
+        # Añade el nuevo supervisor a la base de datos
+        db.session.add(new_supervisor)
+        db.session.commit()
 
-    # Añade el nuevo supervisor a la base de datos
-    db.session.add(new_supervisor)
-    db.session.commit()
+        flash('Supervisor registrado exitosamente.', 'success')
+        return redirect(url_for('login'))
 
-    flash('Supervisor registrado exitosamente.', 'success')
-    return redirect(url_for('login'))
-
+    except Exception as e:
+        # Registra el error en el log
+        logging.error(f"Error en la función register: {e}")
+        # Redirige a la página de inicio en caso de error
+        return redirect(url_for('home'))
 @app.route('/dashDocente/<int:supervisor_id>', methods=['GET', 'POST'])
 @login_required
 def dashDocente(supervisor_id):
@@ -350,33 +368,42 @@ def dashDocente(supervisor_id):
 
     return render_template('vistaDocente.html', supervisor_id=supervisor_id, cursos=cursos, grupos=grupos, curso_seleccionado_id=curso_seleccionado_id,series=series)
 
+
+#Refactoring try-catch 3
 @app.route('/dashDocente/<int:supervisor_id>/cuentaDocente', methods=['GET', 'POST'])
 @login_required
 def cuentaDocente(supervisor_id):
-    if not verify_supervisor(supervisor_id):
-        return redirect(url_for('login'))
-    
-    supervisor = Supervisor.query.get(supervisor_id)
+    try:
+        if not verify_supervisor(supervisor_id):
+            return redirect(url_for('login'))
+        
+        supervisor = Supervisor.query.get(supervisor_id)
 
-    if request.method == 'POST':
-        contraseña_actual = request.form.get('contraseña_actual')
-        nueva_contraseña = request.form.get('nueva_contraseña')
-        confirmar_nueva_contraseña = request.form.get('confirmar_nueva_contraseña')
+        if request.method == 'POST':
+            contraseña_actual = request.form.get('contraseña_actual')
+            nueva_contraseña = request.form.get('nueva_contraseña')
+            confirmar_nueva_contraseña = request.form.get('confirmar_nueva_contraseña')
 
-        # Validaciones
-        if not check_password_hash(supervisor.password, contraseña_actual):
-            flash('Contraseña actual incorrecta', 'danger')
-        elif len(nueva_contraseña) < 10:
-            flash('La nueva contraseña debe tener al menos 6 caracteres', 'danger')
-        elif nueva_contraseña != confirmar_nueva_contraseña:
-            flash('Las nuevas contraseñas no coinciden', 'danger')
-        else:
-            # Cambiar la contraseña
-            supervisor.password = generate_password_hash(nueva_contraseña)
-            db.session.commit()
-            flash('Contraseña actualizada correctamente', 'success')
+            # Validaciones
+            if not check_password_hash(supervisor.password, contraseña_actual):
+                flash('Contraseña actual incorrecta', 'danger')
+            elif len(nueva_contraseña) < 10:
+                flash('La nueva contraseña debe tener al menos 6 caracteres', 'danger')
+            elif nueva_contraseña != confirmar_nueva_contraseña:
+                flash('Las nuevas contraseñas no coinciden', 'danger')
+            else:
+                # Cambiar la contraseña
+                supervisor.password = generate_password_hash(nueva_contraseña)
+                db.session.commit()
+                flash('Contraseña actualizada correctamente', 'success')
 
-    return render_template('cuentaDocente.html', supervisor=supervisor, supervisor_id=supervisor_id)
+        return render_template('cuentaDocente.html', supervisor=supervisor, supervisor_id=supervisor_id)
+
+    except Exception as e:
+        # Registra el error en el log
+        logging.error(f"Error en la función cuentaDocente: {e}")
+        # Redirige a la página de inicio en caso de error
+        return redirect(url_for('home'))
 
 
 @app.route('/dashDocente/<int:supervisor_id>/agregarSerie', methods=['GET', 'POST'])
@@ -930,101 +957,117 @@ def eliminarEstudiante(supervisor_id, curso_id, grupo_id):
 
     return render_template('eliminarEstudiante.html', supervisor_id=supervisor_id, curso=curso, grupo=grupo, estudiantes=estudiantes)
     
+
+#Refactoring try-catch 4
 @app.route('/dashDocente/<int:supervisor_id>/detalleCurso/<int:curso_id>/detalleEstudiante/<int:estudiante_id>', methods=['GET', 'POST'])
 @login_required
 def detallesEstudiante(supervisor_id, curso_id, estudiante_id):
-    if not verify_supervisor(supervisor_id):
-        flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
-        return redirect(url_for('login'))
-    
-    estudiante = Estudiante.query.get(estudiante_id)
-    cursos = []
-    grupos = []
-    
-    # Obtener cursos
-    consulta_cursos = db.session.query(inscripciones).filter_by(id_estudiante=estudiante_id, id_curso=curso_id).all()
-    if consulta_cursos:
-        for consulta in consulta_cursos:
-            curso = Curso.query.get(consulta.id_curso)
-            cursos.append(curso)
-    if not cursos:
-        cursos = None
-        grupos = None
-    # Obtener grupos
-    consulta_grupos = db.session.query(estudiantes_grupos).filter_by(id_estudiante=estudiante_id).all()
-    if consulta_grupos:
-        for consulta in consulta_grupos:
-            grupo = Grupo.query.get(consulta.id_grupo)
-            grupos.append(grupo)
-    if not grupos:
-        grupos = None
+    try:
+        if not verify_supervisor(supervisor_id):
+            flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
+            return redirect(url_for('login'))
+        
+        estudiante = Estudiante.query.get(estudiante_id)
+        cursos = []
+        grupos = []
 
-    # Obtener series asignadas
-    series_asignadas = []
-    ejercicios= []
-    consulta_id_series = db.session.query(serie_asignada).filter(serie_asignada.c.id_grupo.in_([grupo.id for grupo in grupos])).all()
-    if consulta_id_series:
-        for consulta in consulta_id_series:
-            serie = Serie.query.get(consulta.id_serie)
-            ejercicios = Ejercicio.query.filter_by(id_serie=serie.id).all()
-            series_asignadas.append(serie)
-    if not series_asignadas:
-        series_asignadas = None
-    
-    # Obtener ejercicios asignados al estudiante
-    ejercicios_asignados = Ejercicio_asignado.query.filter_by(id_estudiante=estudiante_id).all()
-    
-    # Obtener los ejercicios de las series
-    # Crear una lista para almacenar los datos de los ejercicios
-    ejercicios = []
-    if ejercicios_asignados:
-        for ejercicio_asignado in ejercicios_asignados:
-            ejercicio = Ejercicio.query.get(ejercicio_asignado.id_ejercicio)
-            ejercicios.append(ejercicio)
-    
-    curso_actual = Curso.query.get(curso_id)
-    current_app.logger.info(f'series_asignadas: {series_asignadas}')
-    curso_actual = Curso.query.get(curso_id)
-    current_app.logger.info(f'cursos: {cursos}, grupos: {grupos}')
-    current_app.logger.info(f'ejercicio: {ejercicios}, ejercicios_asignados: {ejercicios_asignados}')
-    return render_template('detallesEstudiantes.html', supervisor_id=supervisor_id, estudiante=estudiante, curso_actual=curso_actual, cursos=cursos, grupos=grupos,series_asignadas=series_asignadas, ejercicios_asignados=ejercicios_asignados)
+        # Obtener cursos
+        consulta_cursos = db.session.query(inscripciones).filter_by(id_estudiante=estudiante_id, id_curso=curso_id).all()
+        if consulta_cursos:
+            for consulta in consulta_cursos:
+                curso = Curso.query.get(consulta.id_curso)
+                cursos.append(curso)
+        if not cursos:
+            cursos = None
+            grupos = None
+        # Obtener grupos
+        consulta_grupos = db.session.query(estudiantes_grupos).filter_by(id_estudiante=estudiante_id).all()
+        if consulta_grupos:
+            for consulta in consulta_grupos:
+                grupo = Grupo.query.get(consulta.id_grupo)
+                grupos.append(grupo)
+        if not grupos:
+            grupos = None
 
+        # Obtener series asignadas
+        series_asignadas = []
+        ejercicios = []
+        consulta_id_series = db.session.query(serie_asignada).filter(serie_asignada.c.id_grupo.in_([grupo.id for grupo in grupos])).all()
+        if consulta_id_series:
+            for consulta in consulta_id_series:
+                serie = Serie.query.get(consulta.id_serie)
+                ejercicios = Ejercicio.query.filter_by(id_serie=serie.id).all()
+                series_asignadas.append(serie)
+        if not series_asignadas:
+            series_asignadas = None
+
+        # Obtener ejercicios asignados al estudiante
+        ejercicios_asignados = Ejercicio_asignado.query.filter_by(id_estudiante=estudiante_id).all()
+
+        # Obtener los ejercicios de las series
+        # Crear una lista para almacenar los datos de los ejercicios
+        ejercicios = []
+        if ejercicios_asignados:
+            for ejercicio_asignado in ejercicios_asignados:
+                ejercicio = Ejercicio.query.get(ejercicio_asignado.id_ejercicio)
+                ejercicios.append(ejercicio)
+
+        curso_actual = Curso.query.get(curso_id)
+        current_app.logger.info(f'series_asignadas: {series_asignadas}')
+        current_app.logger.info(f'cursos: {cursos}, grupos: {grupos}')
+        current_app.logger.info(f'ejercicio: {ejercicios}, ejercicios_asignados: {ejercicios_asignados}')
+        return render_template('detallesEstudiantes.html', supervisor_id=supervisor_id, estudiante=estudiante, curso_actual=curso_actual, cursos=cursos, grupos=grupos,series_asignadas=series_asignadas, ejercicios_asignados=ejercicios_asignados)
+
+    except Exception as e:
+        # Registra el error en el log
+        logging.error(f"Error en la función detallesEstudiante: {e}")
+        # Redirige a la página de inicio en caso de error
+        return redirect(url_for('home'))
+
+#Refactoring try-catch 5
 @app.route('/dashDocente/<int:supervisor_id>/detalleCurso/<int:curso_id>/detalleEstudiante/<int:estudiante_id>/examinarEjercicio/<int:ejercicio_id>', methods=['GET', 'POST'])
 @login_required
 def examinarEjercicio(supervisor_id, curso_id, estudiante_id, ejercicio_id):
-    if not verify_supervisor(supervisor_id):
-        flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
-        return redirect(url_for('login'))
-    estudiante = Estudiante.query.get(estudiante_id)
-    ejercicio = Ejercicio.query.get(ejercicio_id)
-    ejercicio_asignado= Ejercicio_asignado.query.filter_by(id_estudiante=estudiante_id, id_ejercicio=ejercicio_id).first()
-    serie = Serie.query.get(ejercicio.id_serie)
-    grupo = Grupo.query.join(serie_asignada).filter(serie_asignada.c.id_serie == serie.id).first()
-    curso= Curso.query.get(curso_id)
-    estado = ejercicio_asignado.estado
-    test_output= ejercicio_asignado.test_output
-    fecha_ultimo_envio= ejercicio_asignado.fecha_ultimo_envio
-    contador= ejercicio_asignado.contador
-    test_output_dict = json.loads(test_output)
-    if ejercicio and ejercicio.enunciado:
-        with open(ejercicio.enunciado, 'r') as enunciado_file:
-            enunciado_markdown = enunciado_file.read()
-            enunciado_html = markdown.markdown(enunciado_markdown)
-    else:
-        enunciado_html = "<p>El enunciado no está disponible.</p>"
+    try:
+        if not verify_supervisor(supervisor_id):
+            flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
+            return redirect(url_for('login'))
+        
+        estudiante = Estudiante.query.get(estudiante_id)
+        ejercicio = Ejercicio.query.get(ejercicio_id)
+        ejercicio_asignado= Ejercicio_asignado.query.filter_by(id_estudiante=estudiante_id, id_ejercicio=ejercicio_id).first()
+        serie = Serie.query.get(ejercicio.id_serie)
+        grupo = Grupo.query.join(serie_asignada).filter(serie_asignada.c.id_serie == serie.id).first()
+        curso= Curso.query.get(curso_id)
+        estado = ejercicio_asignado.estado
+        test_output= ejercicio_asignado.test_output
+        fecha_ultimo_envio= ejercicio_asignado.fecha_ultimo_envio
+        contador= ejercicio_asignado.contador
+        test_output_dict = json.loads(test_output)
+        if ejercicio and ejercicio.enunciado:
+            with open(ejercicio.enunciado, 'r') as enunciado_file:
+                enunciado_markdown = enunciado_file.read()
+                enunciado_html = markdown.markdown(enunciado_markdown)
+        else:
+            enunciado_html = "<p>El enunciado no está disponible.</p>"
 
-    rutaEnvio = ejercicio_asignado.ultimo_envio
-    current_app.logger.info(f'rutaEnvio: {rutaEnvio}')
-    archivos_java=[]
-    # Obtener la lista de archivos .java en la carpeta
-    for archivo in os.listdir(rutaEnvio):
-        if archivo.endswith('.java'):
-            with open(os.path.join(rutaEnvio, archivo), 'r') as f:
-                contenido = f.read()
-                archivos_java.append({'nombre': archivo, 'contenido': contenido})
+        rutaEnvio = ejercicio_asignado.ultimo_envio
+        current_app.logger.info(f'rutaEnvio: {rutaEnvio}')
+        archivos_java=[]
+        # Obtener la lista de archivos .java en la carpeta
+        for archivo in os.listdir(rutaEnvio):
+            if archivo.endswith('.java'):
+                with open(os.path.join(rutaEnvio, archivo), 'r') as f:
+                    contenido = f.read()
+                    archivos_java.append({'nombre': archivo, 'contenido': contenido})
 
-    return render_template('examinarEjercicio.html', supervisor_id=supervisor_id, estudiante=estudiante, ejercicio=ejercicio, serie=serie, grupo=grupo, curso=curso, ejercicio_asignado=ejercicio_asignado, enunciado=enunciado_html, archivos_java=archivos_java, estado=estado, fecha_ultimo_envio=fecha_ultimo_envio, test_output=test_output_dict, contador=contador)
+        return render_template('examinarEjercicio.html', supervisor_id=supervisor_id, estudiante=estudiante, ejercicio=ejercicio, serie=serie, grupo=grupo, curso=curso, ejercicio_asignado=ejercicio_asignado, enunciado=enunciado_html, archivos_java=archivos_java, estado=estado, fecha_ultimo_envio=fecha_ultimo_envio, test_output=test_output_dict, contador=contador)
 
+    except Exception as e:
+        # Registra el error en el log
+        logging.error(f"Error en la función examinarEjercicio: {e}")
+        # Redirige a la página de inicio en caso de error
+        return redirect(url_for('home'))
 # Ruta para ver el progreso de los estudiantes de un curso
 @app.route('/dashDocente/<int:supervisor_id>/progresoCurso/<int:curso_id>', methods=['GET', 'POST'])
 @login_required
