@@ -1,13 +1,17 @@
 ##import router from flask
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_required
-from basedatos.modelos import Serie, Curso, Ejercicio, Grupo, serie_asignada, Supervisor, Estudiante, estudiantes_grupos, supervisores_grupos, inscripciones, Ejercicio_asignado
-from main import verify_supervisor, db, check_password_hash, generate_password_hash, logging, crearCarpetaSerie, allowed_file, crearCarpetaEjercicio, procesar_archivo_csv, inscripciones, supervisores_grupos, estudiantes_grupos, serie_asignada, app, ALLOWED_EXTENSIONS, calcular_calificacion
+from basedatos.modelos import Ejercicio_asignado, Serie, Curso, Ejercicio, Grupo, serie_asignada, Supervisor, Estudiante, estudiantes_grupos, supervisores_grupos, inscripciones
+from index import app
+from DBManager import db
 from werkzeug.utils import secure_filename
+import services.dash_docente_services as services
 import os
 import shutil
 import markdown
 import json
+from werkzeug.security import generate_password_hash
+import logging
 
 
 router = Blueprint('dash-docente', __name__, url_prefix='/dash-docente')
@@ -16,7 +20,7 @@ router = Blueprint('dash-docente', __name__, url_prefix='/dash-docente')
 @login_required
 def dashDocente(supervisor_id):
     # Usa la función de verificación
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         return redirect(url_for('login'))
     
     series = Serie.query.all()
@@ -80,7 +84,7 @@ def dashDocente(supervisor_id):
 @login_required
 def cuentaDocente(supervisor_id):
     try:
-        if not verify_supervisor(supervisor_id):
+        if not services.verify_supervisor(supervisor_id):
             return redirect(url_for('login'))
         
         supervisor = Supervisor.query.get(supervisor_id)
@@ -91,7 +95,7 @@ def cuentaDocente(supervisor_id):
             confirmar_nueva_contraseña = request.form.get('confirmar_nueva_contraseña')
 
             # Validaciones
-            if not check_password_hash(supervisor.password, contraseña_actual):
+            if not services.check_password_hash(supervisor.password, contraseña_actual):
                 flash('Contraseña actual incorrecta', 'danger')
             elif len(nueva_contraseña) < 10:
                 flash('La nueva contraseña debe tener al menos 6 caracteres', 'danger')
@@ -115,7 +119,7 @@ def cuentaDocente(supervisor_id):
 @router.route('/dashDocente/<int:supervisor_id>/agregarSerie', methods=['GET', 'POST'])
 @login_required
 def agregarSerie(supervisor_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         return redirect(url_for('login'))
 
     if request.method == 'POST':
@@ -130,7 +134,7 @@ def agregarSerie(supervisor_id):
             db.session.add(nueva_serie)
             db.session.flush()
             try:
-                crearCarpetaSerie(nueva_serie.id)
+                services.crearCarpetaSerie(nueva_serie.id)
                 current_app.logger.info(f'Se creó la carpeta de la serie {nueva_serie.nombre} con éxito.')
                 db.session.commit()
             except Exception as e:
@@ -145,7 +149,7 @@ def agregarSerie(supervisor_id):
 @router.route('/dashDocente/<int:supervisor_id>/agregarEjercicio', methods=['GET', 'POST'])
 @login_required
 def agregarEjercicio(supervisor_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         return redirect(url_for('login'))
 
     series = Serie.query.all()
@@ -160,7 +164,7 @@ def agregarEjercicio(supervisor_id):
             unitTestFiles = request.files.getlist('archivosJava')
             serie_actual = db.session.get(Serie, int(id_serie))
 
-            if not any(allowed_file(file.filename, '.java') for file in unitTestFiles):
+            if not any(services.allowed_file(file.filename, '.java') for file in unitTestFiles):
                 flash('Por favor, carga al menos un archivo .java.', 'danger')
                 return render_template('agregarEjercicio.html', supervisor_id=supervisor_id, series=series)
 
@@ -171,7 +175,7 @@ def agregarEjercicio(supervisor_id):
             db.session.add(nuevo_ejercicio)
             db.session.flush()
 
-            rutaEjercicio, rutaEnunciadoEjercicios, mensaje = crearCarpetaEjercicio(nuevo_ejercicio.id, id_serie)
+            rutaEjercicio, rutaEnunciadoEjercicios, mensaje = services.crearCarpetaEjercicio(nuevo_ejercicio.id, id_serie)
 
             if rutaEjercicio is None:
                 raise Exception(mensaje)
@@ -219,7 +223,7 @@ def agregarEjercicio(supervisor_id):
 @router.route('/dashDocente/<int:supervisor_id>/serie/<int:serie_id>', methods=['GET', 'POST'])
 @login_required
 def detallesSeries(supervisor_id, serie_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
 
@@ -288,7 +292,7 @@ def detallesSeries(supervisor_id, serie_id):
 @router.route('/dashDocente/<int:supervisor_id>/serie/<int:serie_id>/ejercicio/<int:ejercicio_id>', methods=['GET','POST'])
 @login_required
 def detallesEjercicio(supervisor_id, serie_id, ejercicio_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
     ejercicio = Ejercicio.query.get(ejercicio_id)
@@ -378,7 +382,7 @@ def detallesEjercicio(supervisor_id, serie_id, ejercicio_id):
 def registrarEstudiantes(supervisor_id):
     # Ruta para recibir un archivo csv con los datos de los estudiantes y registrarlos en la base de datos
     # Usa la función de verificación
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
 
@@ -410,12 +414,12 @@ def registrarEstudiantes(supervisor_id):
             elif accion == 'registrarEstudiantes':
                 id_curso=request.form['curso']
                 listaClases = request.files['listaClases']
-                if listaClases and allowed_file(listaClases.filename, ALLOWED_EXTENSIONS):
+                if listaClases and services.allowed_file(listaClases.filename, services.ALLOWED_EXTENSIONS):
                     filename = secure_filename(listaClases.filename)
                     listaClases.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
                     # Procesa el archivo y agrega a la bd
-                    procesar_archivo_csv(filename, id_curso)
+                    services.procesar_archivo_csv(filename, id_curso)
 
                     return redirect(url_for('dashDocente', supervisor_id=supervisor_id))
         except Exception as e:
@@ -527,7 +531,7 @@ def detallesCurso(supervisor_id, curso_id):
 @router.route('/dashDocente/<int:supervisor_id>/asignarGrupos/<int:curso_id>', methods=['GET', 'POST'])
 @login_required
 def asignarGrupos(supervisor_id, curso_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
 
@@ -594,7 +598,7 @@ def asignarGrupos(supervisor_id, curso_id):
 @router.route('/dashDocente/<int:supervisor_id>/detalleCurso/<int:curso_id>/detalleGrupo/<int:grupo_id>', methods=['GET', 'POST'])
 @login_required
 def detallesGrupo(supervisor_id, curso_id, grupo_id):
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
     grupo=Grupo.query.get(grupo_id)
@@ -669,7 +673,7 @@ def eliminarEstudiante(supervisor_id, curso_id, grupo_id):
 @login_required
 def detallesEstudiante(supervisor_id, curso_id, estudiante_id):
     try:
-        if not verify_supervisor(supervisor_id):
+        if not services.verify_supervisor(supervisor_id):
             flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
             return redirect(url_for('login'))
         
@@ -735,7 +739,7 @@ def detallesEstudiante(supervisor_id, curso_id, estudiante_id):
 @login_required
 def examinarEjercicio(supervisor_id, curso_id, estudiante_id, ejercicio_id):
     try:
-        if not verify_supervisor(supervisor_id):
+        if not services.verify_supervisor(supervisor_id):
             flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
             return redirect(url_for('login'))
         
@@ -779,7 +783,7 @@ def examinarEjercicio(supervisor_id, curso_id, estudiante_id, ejercicio_id):
 @login_required
 def progresoCurso(supervisor_id, curso_id):
 
-    if not verify_supervisor(supervisor_id):
+    if not services.verify_supervisor(supervisor_id):
         flash('No tienes permiso para acceder a este dashboard. Debes ser un Supervisor.', 'danger')
         return redirect(url_for('login'))
 
@@ -837,7 +841,7 @@ def progresoCurso(supervisor_id, curso_id):
 
             # Calcula la calificación usando la función calcular_calificacion
             if puntos_obtenidos is not None:
-                estudiante_info['calificacion'] = calcular_calificacion(total_puntos, puntos_obtenidos)
+                estudiante_info['calificacion'] = services.calcular_calificacion(total_puntos, puntos_obtenidos)
 
             colores_info.append(estudiante_info)
 
