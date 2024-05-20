@@ -21,6 +21,7 @@ import logging
 from logging.config import dictConfig
 from ansi2html import Ansi2HTMLConverter
 import json
+from routers.dash_docente_router import router
 
 #Refactoring try-catch
 import logging
@@ -61,6 +62,9 @@ dictConfig({
 app = Flask(__name__)
 init_app(app)
 app.config['SECRET_KEY'] = 'secret-key-goes-here'
+
+## agregar las rutas
+app.register_blueprint(router)
 
 
 login_manager = LoginManager()
