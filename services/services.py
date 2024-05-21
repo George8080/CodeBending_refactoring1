@@ -1,6 +1,6 @@
 import logging
 from sqlite3 import IntegrityError
-from index import app
+from flask import current_app as app
 import os
 import csv
 from flask import flash, current_app, redirect, render_template, url_for, request

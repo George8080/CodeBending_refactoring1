@@ -1,24 +1,35 @@
 from datetime import timedelta
 import os
-from flask import  render_template, request, url_for, redirect, flash
+from flask import  Flask, render_template, request, url_for, redirect, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash, check_password_hash
-from DBManager import db
+from DBManager import db, init_app
 import logging
 from logging.config import dictConfig
 from routers.dash_docente_router import router as dashDocenteRouter
 from routers.dash_estudiante_router import router as dashEstudianteRouter
-from index import app
 import services.services as services
 from basedatos.modelos import Estudiante, Supervisor
+
+
+
+#Refactoring try-catch
+import logging
+
+#inicializar la aplicacion
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret-key-goes-here'
+
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'  # Nombre de la vista para iniciar sesión
+init_app(app)
 
 
 #registrar el blueprint
 app.register_blueprint(dashDocenteRouter)
 app.register_blueprint(dashEstudianteRouter)
-
-#Refactoring try-catch
-import logging
 
 # Configura el logger
 logging.basicConfig(filename='error.log', level=logging.ERROR)
