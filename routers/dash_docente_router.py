@@ -5,7 +5,7 @@ from basedatos.modelos import Ejercicio_asignado, Serie, Curso, Ejercicio, Grupo
 from index import app
 from DBManager import db
 from werkzeug.utils import secure_filename
-import services.dash_docente_services as services
+import services.services as services
 import os
 import shutil
 import markdown

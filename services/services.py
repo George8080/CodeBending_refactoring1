@@ -3,7 +3,7 @@ from sqlite3 import IntegrityError
 from index import app
 import os
 import csv
-from flask import flash, current_app, redirect, url_for, request
+from flask import flash, current_app, redirect, render_template, url_for, request
 from werkzeug.security import generate_password_hash
 from basedatos.modelos import Estudiante, Supervisor, inscripciones
 from DBManager import db
@@ -160,3 +160,9 @@ def get_fields(forms):
     for key in forms:
         fields[key] = request.form.get(key)
     return fields
+
+#Funcion para ejecutar el script 404
+def pagina_no_encontrada(error):
+    return render_template('404.html'), 404
+    #return redirect(url_for('index')) #te devuelve a esa página
+
