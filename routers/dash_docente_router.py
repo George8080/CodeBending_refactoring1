@@ -1,17 +1,6 @@
 ##import router from flask
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from flask import Blueprint
 from flask_login import login_required
-from basedatos.modelos import Ejercicio_asignado, Serie, Curso, Ejercicio, Grupo, serie_asignada, Supervisor, Estudiante, estudiantes_grupos, supervisores_grupos, inscripciones
-from flask import current_app as app
-from DBManager import db
-from werkzeug.utils import secure_filename
-import services.services as services
-import os
-import shutil
-import markdown
-import json
-from werkzeug.security import generate_password_hash
-import logging
 import controllers.dash_docente_controller as controller
 
 

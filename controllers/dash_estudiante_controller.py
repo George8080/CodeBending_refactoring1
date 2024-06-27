@@ -37,9 +37,9 @@ def dashEstudiante(estudiante_id):
     )
     # Si no se encuentra ningún grupo asignado, grupo será None
     if not grupo:
-        grupo_nombre = "Ningún grupo asignado"
+        pass
     else:
-        grupo_nombre = grupo.nombre
+        grupo.nombre
 
     supervisor = None
 

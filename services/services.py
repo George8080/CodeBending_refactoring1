@@ -49,7 +49,7 @@ def procesar_archivo_csv(filename, curso_id):
                     db.session.execute(nueva_inscripcion)
                     db.session.commit()
                     flash(f'El estudiante con matrícula {matricula} ha sido inscrito en el curso.', 'success')
-                except IntegrityError as e:
+                except IntegrityError:
                     db.session.rollback()
                     flash(f'Error al registrar en el curso {curso_id} al estudiante {matricula} .', 'warning')
                     continue
@@ -71,7 +71,7 @@ def procesar_archivo_csv(filename, curso_id):
                     estudiante_id = estudiante.id  # Obtener el id del estudiante recién creado
                     db.session.commit()
                     flash(f'El estudiante con matrícula {matricula} ha sido registrado en la base de datos.', 'success')
-                except Exception as e:
+                except Exception:
                     db.session.rollback()
                     flash(f'Error al crear al registrar {nombres} {apellidos} .', 'warning')
                     continue
@@ -82,7 +82,7 @@ def procesar_archivo_csv(filename, curso_id):
                     db.session.execute(nueva_inscripcion)
                     db.session.commit()
                     flash(f'El estudiante con matrícula {matricula} ha sido inscrito en el curso.', 'success')
-                except Exception as e:
+                except Exception:
                     db.session.rollback()
                     flash(f'Error al inscribir a {nombres} {apellidos} en el curso.', 'warning')
                     continue

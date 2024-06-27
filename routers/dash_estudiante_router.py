@@ -1,15 +1,5 @@
-import markdown
-from flask import current_app as app 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint
 from flask_login import login_required
-from basedatos.modelos import db, Estudiante, Supervisor, Curso, Grupo, Serie, Ejercicio, Ejercicio_asignado, inscripciones, estudiantes_grupos, supervisores_grupos, serie_asignada
-from services.services import services
-from datetime import datetime
-import os
-import json
-from funciones_archivo.manejoCarpetas import agregarCarpetaSerieEstudiante, agregarCarpetaEjercicioEstudiante, crearArchivadorEstudiante
-from funciones_archivo.manejoMaven import ejecutarTestUnitario
-from werkzeug.security import generate_password_hash, check_password_hash
 from controllers import dash_estudiante_controller as controller
 
 

@@ -19,14 +19,12 @@ def dashDocente(supervisor_id):
     series = Serie.query.all()
     cursos = Curso.query.all()
     ejercicios = Ejercicio.query.all()
-    ejercicios_por_serie = {}
 
     # Verificar si hay cursos, series y ejercicios
     curso_seleccionado_id=None
     grupos = []
     if not cursos:
         flash('No existen cursos, por favor crear un curso', 'danger')
-        id_curso_seleccionado=None
 
     if not series:
         flash('No existen series, por favor crear una serie', 'danger')
@@ -59,7 +57,7 @@ def dashDocente(supervisor_id):
                     grupos = Grupo.query.filter_by(id_curso=curso_seleccionado_id).all()
                     series = Serie.query.all()
                     return redirect(url_for('dashDocente', supervisor_id=supervisor_id))
-            except Exception as e:
+            except Exception:
                 db.session.rollback()
                 flash('Error al asignar la serie', 'danger')
                 return redirect(url_for('dashDocente', supervisor_id=supervisor_id))
@@ -128,7 +126,7 @@ def agregarSerie(supervisor_id):
                 db.session.rollback()
                 current_app.logger.error(f'Ocurrió un error al crear la carpeta de la serie: {str(e)}')
                 return render_template('agregarSerie.html', supervisor_id=supervisor_id)
-        except Exception as e:
+        except Exception:
             db.session.rollback()
     return render_template('agregarSerie.html', supervisor_id=supervisor_id)
  
@@ -147,7 +145,7 @@ def agregarEjercicio(supervisor_id):
             enunciadoFile = request.files.get('enunciadoFile')
             imagenesFiles = request.files.getlist('imagenesFiles')
             unitTestFiles = request.files.getlist('archivosJava')
-            serie_actual = db.session.get(Serie, int(id_serie))
+            db.session.get(Serie, int(id_serie))
 
             if not any(services.allowed_file(file.filename, '.java') for file in unitTestFiles):
                 flash('Por favor, carga al menos un archivo .java.', 'danger')
@@ -292,7 +290,7 @@ def detallesEjercicio(supervisor_id, serie_id, ejercicio_id):
             current_app.logger.info(f'Editando el ejercicio...{ejercicio.nombre}')
             nombreEjercicio = request.form.get('nuevo_nombre')
             enunciadoFile = request.files.get('enunciadoFile')
-            imagenesFiles = request.files.getlist('imagenesFiles')
+            request.files.getlist('imagenesFiles')
             unitTestFiles = request.files.getlist('archivosJava')
             current_app.logger.info(f' ENUNCIADO: {enunciadoFile}')
             if nombreEjercicio:
@@ -458,7 +456,7 @@ def detallesCurso(supervisor_id, curso_id):
                 db.session.execute(supervisores_grupos.delete().where(supervisores_grupos.c.id_grupo.in_([grupo.id for grupo in grupos])))
                 
                 # Guardar el id de las series asignadas a los grupos.
-                id_series_asignadas = [serie.id for serie in series_asignadas]
+                [serie.id for serie in series_asignadas]
 
                 # Borrar las series asignadas a los grupos
                 db.session.execute(serie_asignada.delete().where(serie_asignada.c.id_grupo.in_([grupo.id for grupo in grupos])))
